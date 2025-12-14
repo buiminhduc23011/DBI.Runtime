@@ -4,7 +4,7 @@ Thư viện C# mô phỏng runtime PLC Siemens S7-1200/S7-1500 trên .NET 8+.
 
 Hỗ trợ chuẩn **IEC 61131-3** và các extension đặc thù của Siemens.
 
-## 📦 Cài đặt
+## Cài đặt
 
 ```bash
 # Clone repository
@@ -18,7 +18,7 @@ dotnet build
 dotnet test
 ```
 
-## 🚀 Bắt đầu nhanh
+## Bắt đầu nhanh
 
 ### Tạo PLC Runtime
 
@@ -58,7 +58,7 @@ runtime.ExecuteSingleCycle();
 
 ---
 
-## 📚 Các Function Blocks
+## Các Function Blocks
 
 ### Timers (Bộ định thời)
 
@@ -251,7 +251,7 @@ ff.Execute();
 
 ---
 
-## 🔧 Các Functions (Stateless)
+## Các Functions (Stateless)
 
 ### Math Functions
 
@@ -331,7 +331,7 @@ int truncated = ConvertFunctions.TRUNC(3.9f);  // 3
 
 ---
 
-## 💾 Memory System
+## Memory System
 
 ### PLC Memory Areas
 
@@ -366,7 +366,7 @@ bool bitVal = memory.M[0][5];
 
 ---
 
-## ⚙️ PLC Runtime
+## PLC Runtime
 
 ### Cấu hình và chạy
 
@@ -418,7 +418,7 @@ Assert.True(ton.Q);
 
 ---
 
-## 📁 Cấu trúc Project
+## Cấu trúc Project
 
 ```
 DBI.Runtime/
@@ -438,12 +438,269 @@ DBI.Runtime/
 │       ├── Compare/         # CompareFunctions
 │       ├── Convert/         # ConvertFunctions
 │       └── BitLogic/        # PlcBitLogic
+├── Motion/
+│   ├── Interfaces/      # IMotionController, IServoAxis
+│   ├── FunctionBlocks/  # MC_Power, MC_MoveAbsolute, MC_Home...
+│   └── Drivers/
+│       ├── Leadshine/   # DMC2410
+│       ├── Advantech/   # PCI-1240
+│       └── Simulation/  # SimulatedMotionController
 └── tests/DBI.Runtime.Tests/
 ```
 
 ---
 
-## 📋 Danh sách Function Blocks
+## Motion Control (Điều khiển Servo)
+
+Hỗ trợ các card điều khiển motion control PCIe của Leadshine và Advantech.
+
+### Cards được hỗ trợ
+
+| Hãng | Card | Số trục | Giao thức |
+|------|------|---------|-----------|
+| **Leadshine** | DMC2410 | 4 | Pulse/Direction, CW/CCW |
+| **Advantech** | PCI-1240U | 4 | Pulse/Direction, CW/CCW |
+
+### Khởi tạo Motion Controller
+
+#### Leadshine DMC2410
+
+```csharp
+using DBI.Runtime.Motion.Drivers.Leadshine;
+using DBI.Runtime.Motion.Interfaces;
+
+// Tạo controller
+var controller = new Dmc2410Controller();
+
+// Cấu hình
+var config = new MotionControllerConfig
+{
+    CardNumber = 0,
+    AxisCount = 4
+};
+
+// Khởi tạo
+if (controller.Initialize(config))
+{
+    // Lấy trục
+    var xAxis = controller.GetAxis(0);
+    var yAxis = controller.GetAxis(1);
+    
+    // Cấu hình trục
+    xAxis.Configure(new AxisConfig
+    {
+        PulsesPerUnit = 1000,  // 1000 pulse/mm
+        MaxVelocity = 100000,  // 100 mm/s
+        PulseMode = PulseOutputMode.PulseDirection
+    });
+}
+```
+
+#### Advantech PCI-1240U
+
+```csharp
+using DBI.Runtime.Motion.Drivers.Advantech;
+
+var controller = new Pci1240Controller();
+controller.Initialize(new MotionControllerConfig { CardNumber = 0, AxisCount = 4 });
+
+var axis = controller.GetAxis(0);
+axis.Enable();
+```
+
+#### Simulated (Testing)
+
+```csharp
+using DBI.Runtime.Motion.Drivers.Simulation;
+
+// Không cần phần cứng
+var controller = new SimulatedMotionController(axisCount: 4);
+controller.Initialize(new MotionControllerConfig { AxisCount = 4 });
+```
+
+### PLCopen Motion Control Function Blocks
+
+#### MC_Power - Bật/tắt servo
+
+```csharp
+using DBI.Runtime.Motion.FunctionBlocks;
+
+var mcPower = new MC_Power(timeSource)
+{
+    Axis = controller.GetAxis(0),
+    Enable = true
+};
+
+mcPower.Execute();
+
+if (mcPower.Status)
+{
+    Console.WriteLine("Servo enabled");
+}
+```
+
+#### MC_Home - Chạy homing
+
+```csharp
+var mcHome = new MC_Home(timeSource)
+{
+    Axis = axis,
+    Mode = HomingMode.HomeSwitch,
+    Velocity = 10000,
+    Acceleration = 50000
+};
+
+mcHome.ExecuteCmd = true;  // Rising edge bắt đầu homing
+mcHome.Execute();
+
+while (!mcHome.Done)
+{
+    axis.UpdateStatus();
+    mcHome.Execute();
+    Thread.Sleep(10);
+}
+
+Console.WriteLine("Homing complete!");
+```
+
+#### MC_MoveAbsolute - Di chuyển tuyệt đối
+
+```csharp
+var mcMove = new MC_MoveAbsolute(timeSource)
+{
+    Axis = axis,
+    Position = 100.0,      // mm
+    Velocity = 50.0,       // mm/s
+    Acceleration = 200.0,  // mm/s²
+    Deceleration = 200.0
+};
+
+mcMove.ExecuteCmd = true;
+mcMove.Execute();
+
+// Chờ hoàn thành
+while (mcMove.Busy)
+{
+    axis.UpdateStatus();
+    mcMove.Execute();
+    Thread.Sleep(1);
+}
+
+if (mcMove.Done)
+{
+    Console.WriteLine($"Position: {axis.ActualPosition}");
+}
+```
+
+#### MC_MoveRelative - Di chuyển tương đối
+
+```csharp
+var mcMoveRel = new MC_MoveRelative(timeSource)
+{
+    Axis = axis,
+    Distance = 50.0,       // mm
+    Velocity = 30.0,
+    Acceleration = 100.0
+};
+
+mcMoveRel.ExecuteCmd = true;
+mcMoveRel.Execute();
+```
+
+#### MC_Stop - Dừng chuyển động
+
+```csharp
+var mcStop = new MC_Stop(timeSource)
+{
+    Axis = axis,
+    Deceleration = 500.0
+};
+
+mcStop.ExecuteCmd = true;
+mcStop.Execute();
+```
+
+#### MC_MoveVelocity - Chạy liên tục
+
+```csharp
+var mcVel = new MC_MoveVelocity(timeSource)
+{
+    Axis = axis,
+    Velocity = 20.0,       // mm/s (dấu = hướng)
+    Acceleration = 100.0
+};
+
+mcVel.ExecuteCmd = true;
+mcVel.Execute();
+
+// Chạy liên tục cho đến khi dừng
+await Task.Delay(5000);
+
+mcVel.ExecuteCmd = false;
+axis.Stop(100.0);
+```
+
+### Multi-Axis Interpolation
+
+```csharp
+// Linear interpolation 2 trục
+controller.StartLinearInterpolation(
+    axes: new[] { 0, 1 },
+    positions: new[] { 100.0, 50.0 },
+    profile: MotionProfile.Trapezoidal(velocity: 50.0, acceleration: 200.0)
+);
+
+// Chờ hoàn thành
+bool success = controller.WaitForMotionComplete(new[] { 0, 1 }, timeoutMs: 10000);
+```
+
+### Direct Axis Control
+
+```csharp
+var axis = controller.GetAxis(0);
+
+// Enable
+axis.Enable();
+
+// Di chuyển
+axis.MoveAbsolute(100.0, MotionProfile.Trapezoidal(50.0, 200.0));
+
+// Kiểm tra trạng thái
+while (axis.IsMoving)
+{
+    Console.WriteLine($"Pos: {axis.ActualPosition:F2}");
+    axis.UpdateStatus();
+    Thread.Sleep(10);
+}
+
+// Emergency stop
+axis.EmergencyStop();
+
+// Reset error
+axis.ResetError();
+
+// Disable
+axis.Disable();
+```
+
+### Cài đặt Driver
+
+#### Leadshine DMC2410
+
+1. Tải SDK từ: https://www.leadshine.com/download
+2. Cài đặt driver DMC2410
+3. Copy `dmc2410.dll` vào thư mục project
+
+#### Advantech PCI-1240U
+
+1. Tải SDK từ: https://support.advantech.com
+2. Cài đặt driver PCI-1240
+3. DLL path: `C:\Program Files\Advantech\Motion\PCI-1240\`
+4. Copy `mPC1240.dll` vào thư mục project
+
+---
+
+## Danh sách Function Blocks
 
 | Category | Block | Description |
 |----------|-------|-------------|
@@ -465,7 +722,7 @@ DBI.Runtime/
 
 ---
 
-## 🧪 Chạy Tests
+## Chạy Tests
 
 ```bash
 # Chạy tất cả tests
@@ -480,13 +737,13 @@ dotnet test --filter "FullyQualifiedName~TON"
 
 ---
 
-## 📄 License
+## License
 
 MIT License
 
 ---
 
-## 🤝 Đóng góp
+## Đóng góp
 
 1. Fork repository
 2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
