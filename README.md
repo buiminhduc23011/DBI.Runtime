@@ -4,7 +4,7 @@ Thư viện C# mô phỏng runtime PLC Siemens S7-1200/S7-1500 trên .NET 8+.
 
 Hỗ trợ chuẩn **IEC 61131-3** và các extension đặc thù của Siemens.
 
-## 📦 Cài đặt
+## Cài đặt
 
 ```bash
 # Clone repository
@@ -18,7 +18,7 @@ dotnet build
 dotnet test
 ```
 
-## 🚀 Bắt đầu nhanh
+## Bắt đầu nhanh
 
 ### Tạo PLC Runtime
 
@@ -58,7 +58,7 @@ runtime.ExecuteSingleCycle();
 
 ---
 
-## 📚 Các Function Blocks
+## Các Function Blocks
 
 ### Timers (Bộ định thời)
 
@@ -251,7 +251,7 @@ ff.Execute();
 
 ---
 
-## 🔧 Các Functions (Stateless)
+## Các Functions (Stateless)
 
 ### Math Functions
 
@@ -331,7 +331,7 @@ int truncated = ConvertFunctions.TRUNC(3.9f);  // 3
 
 ---
 
-## 💾 Memory System
+## Memory System
 
 ### PLC Memory Areas
 
@@ -366,7 +366,7 @@ bool bitVal = memory.M[0][5];
 
 ---
 
-## ⚙️ PLC Runtime
+## PLC Runtime
 
 ### Cấu hình và chạy
 
@@ -418,7 +418,7 @@ Assert.True(ton.Q);
 
 ---
 
-## 📁 Cấu trúc Project
+## Cấu trúc Project
 
 ```
 DBI.Runtime/
@@ -443,7 +443,7 @@ DBI.Runtime/
 
 ---
 
-## 📋 Danh sách Function Blocks
+## Danh sách Function Blocks
 
 | Category | Block | Description |
 |----------|-------|-------------|
@@ -465,7 +465,7 @@ DBI.Runtime/
 
 ---
 
-## 🧪 Chạy Tests
+## Chạy Tests
 
 ```bash
 # Chạy tất cả tests
@@ -480,13 +480,13 @@ dotnet test --filter "FullyQualifiedName~TON"
 
 ---
 
-## 📄 License
+## License
 
 MIT License
 
 ---
 
-## 🤝 Đóng góp
+## Đóng góp
 
 1. Fork repository
 2. Tạo feature branch (`git checkout -b feature/AmazingFeature`)
